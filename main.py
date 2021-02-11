@@ -6,6 +6,7 @@
 #   LOPEZ, Earth
 
 import os
+import signal
 import argparse
 from argparse import RawTextHelpFormatter
 from scapy.all import *
@@ -45,5 +46,10 @@ def main(argv):
           clients.append({'IP Address': r.psrc, 'MAC Address': r.hwsrc})
         print(tabulate(clients, headers="keys", tablefmt="psql"))
 
+def KeyboardInterruptHandler(signal, frame):
+  print("Goodbye!")
+  sys.exit(0)
+
 if __name__ == "__main__":
+  signal.signal(signal.SIGINT, KeyboardInterruptHandler)
   main(sys.argv[1:])

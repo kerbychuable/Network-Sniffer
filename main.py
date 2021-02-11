@@ -28,6 +28,9 @@ def main(argv):
   arp_scan.add_argument('-arp', '--arp-scan', action="store_true", help="Scan Address Resolution Protocol to see connected devices to network")
   arp_scan.add_argument('-ip', default="", help="Target IP subnetwork")
 
+  sniffer = parser.add_argument_group('Packet Sniffing')
+  sniffer.add_argument('-sniff', action="store_true", help="Sniff network packets")
+
   args = parser.parse_args()
   if("-arp" in argv) or ("--arp-scan" in argv):
     # target_ip = input("Input IP range for scanning (e.g. 192.168.0.1/24): ")
@@ -46,6 +49,13 @@ def main(argv):
           clients.append({'IP Address': r.psrc, 'MAC Address': r.hwsrc})
         print(tabulate(clients, headers="keys", tablefmt="psql"))
 
+  elif "-sniff" in argv:
+    # pkts = sniff(iface="Ethernet", prn=lambda x: x.summary(), count = 20)
+    pkts = sniff(iface="Ethernet", filter="arp", count=20)
+    for pkt in pkts:
+      print(pkt.summary())
+    wrpcap("temp.cap", pkts)
+    
 def KeyboardInterruptHandler(signal, frame):
   print("Goodbye!")
   sys.exit(0)

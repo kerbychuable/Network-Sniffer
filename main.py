@@ -137,6 +137,28 @@ def decode_protocol(pkt, local=True):
       else:
         srvc_guess = str(pkt.sport)
         services['OTHERS'] += 1
+
+      found = False
+      if not send_count:
+        send_count.append({'ip': str(pkt.src), 'count': 1})
+      else:
+        for send in send_count:
+          if send['ip'] == str(pkt.src):
+            found = True
+            send['count'] += 1
+        if not found:
+          send_count.append({'ip': str(pkt.src), 'count': 1})
+
+      found = False
+      if not rcv_count:
+        rcv_count.append({'ip': str(pkt.dst), 'count': 1})
+      else:
+        for rcv in rcv_count:
+          if rcv['ip'] == str(pkt.dst):
+            found = True
+            rcv['count'] += 1
+        if not found:
+          rcv_count.append({'ip': str(pkt.dst), 'count': 1})
     except AttributeError:
         srvc_guess = None
   else:
@@ -147,28 +169,6 @@ def decode_protocol(pkt, local=True):
               srvc_guess = str(pkt.dport)
       except AttributeError:
           srvc_guess = None
-
-  found = False
-  if not send_count:
-    send_count.append({'ip': str(pkt.src), 'count': 1})
-  else:
-    for send in send_count:
-      if send['ip'] == str(pkt.src):
-        found = True
-        send['count'] += 1
-    if not found:
-      send_count.append({'ip': str(pkt.src), 'count': 1})
-
-  found = False
-  if not rcv_count:
-    rcv_count.append({'ip': str(pkt.dst), 'count': 1})
-  else:
-    for rcv in rcv_count:
-      if rcv['ip'] == str(pkt.dst):
-        found = True
-        rcv['count'] += 1
-    if not found:
-      rcv_count.append({'ip': str(pkt.dst), 'count': 1})
   
   return srvc_guess
 
@@ -280,7 +280,7 @@ def KeyboardInterruptHandler(signal, frame):
     for srvc, value in services.items():
       print(srvc, ':', value)
 
-    print('Top Conversation')
+    print('\nTop Conversation')
     print('[Sender] ', end="")
     highest_count = -1
     ip = ""
@@ -289,6 +289,10 @@ def KeyboardInterruptHandler(signal, frame):
       if sender['count'] > highest_count:
         ip = sender['ip']
         highest_count = sender['count']
+    for res in results:
+      if ip == res['Src IP']:
+        mac = res['Src MAC']
+        break
     print('%s (%s) sent %d packets' % (ip, mac, highest_count))
 
     print('[Receiver] ', end="")
@@ -299,9 +303,13 @@ def KeyboardInterruptHandler(signal, frame):
       if receiver['count'] > highest_count:
         ip = receiver['ip']
         highest_count = receiver['count']
+    for res in results:
+      if ip == res['Dest IP']:
+        mac = res['Dest MAC']
+        break
     print('%s (%s) sent %d packets' % (ip, mac, highest_count))
 
-  print("Goodbye!")
+  print("\nGoodbye!")
   sys.exit(0)
 
 if __name__ == "__main__":

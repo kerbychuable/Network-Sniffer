@@ -12,13 +12,16 @@ from argparse import RawTextHelpFormatter
 from scapy.all import *
 from tabulate import tabulate
 
+import collections
+
 # Globals
 iface = ""
 count = None
 fileName = None
 verbose = False
-pktCount = 0;
+pktCount = 0
 results = []
+services = {'HTTP': 0, 'HTTPS': 0, 'DHCP': 0, 'ARP': 0, 'FTP': 0, 'SMTP': 0, 'POP3': 0, 'SSH': 0, 'TELNET': 0, 'OTHERS' : 0}
 
 protocols = {
   1: "(ICMP)",
@@ -28,20 +31,13 @@ protocols = {
   6: "(TCP)",
   17: "(UDP)",
   47: "General Routing Encapsulation (PPTP data over GRE)",
-  51: "(AH) IPSec",
-  50: "(ESP) IPSec",
-  8: "(EGP)",
   3: "Gateway-Gateway Protocol (GGP)",
-  20: "Host Monitoring Protocol (HMP)",
   88: "(IGMP)",
-  66: "MIT Remote Virtual Disk (RVD)",
   89: "OSPF Open Shortest Path First",
-  12: "PARC Universal Packet Protocol (PUP)",
-  27: "Reliable Datagram Protocol (RDP)",
-  89: "Reservation Protocol (RSVP) QoS"
 }
 
 service_guesses = {
+  20: "FTP",
   21: "FTP",
   22: "SSH",
   23: "TELNET",
@@ -49,34 +45,11 @@ service_guesses = {
   53: "DNS",
   67: "DHCP",
   68: "DHCP",
+  69: "TFTP",
   80: "HTTP",
   110: "POP3",
   115: "Simple File Transfer Protocol",
-  118: "SQL Services",
-  123: "NTP",
-  137: "NetBIOS Name Service",
-  138: "NetBIOS Datagram Service",
-  139: "NetBIOS Session Service",
-  143: "IMAP",
-  152: "Background File Transfer Protocol (BFTP)",
-  156: "SQL Services",
-  161: "SNMP",
-  194: "IRC",
-  199: "SNMP Multiplexing (SMUX)",
-  220: "IMAPv3",
-  280: "http-mgmt",
-  389: "LDAP",
   443: "HTTPS",
-  464: "Kerb password change/set",
-  500: "ISAKMP/IKE",
-  513: "rlogon",
-  514: "rshell",
-  520: "RIP",
-  530: "RPC",
-  543: "klogin, Kerberos login",
-  544: "kshell, Kerb Remote shell",
-  3306: "MySQL",
-  5432: "PostgreSQL",
   8080: "HTTP"
 }
 
@@ -121,10 +94,10 @@ def packet_recv(pkt):
   except:
       proto_name = "(unknown)"
 
-  svc_guess_local = decode_protocol(p)
-  svc_guess_remote = decode_protocol(p, False)
-
-  if svc_guess_remote and svc_guess_remote in ["IMAP","POP3","SMTP"]:
+  srvc_local = decode_protocol(p)
+  srvc_remote = decode_protocol(p, False)
+        
+  if srvc_remote and srvc_remote in ["IMAP","POP3","SMTP"]:
       if verbose:
           print ("[+] Checking for mail creds")
       mail_creds(pkt)
@@ -133,20 +106,44 @@ def packet_recv(pkt):
           print ("[+] ARP packet being sent to ARP specific function")
       arp_display(pkt)
 
-  results.append({'No': pktCount, 'Protocol': proto_name, 'Src IP': p.src, 'Src MAC': str(pkt.src), 'Src Service': svc_guess_local, 'Dest IP': p.dst, 'Dest MAC': str(pkt.dst), 'Dest Service': svc_guess_remote})
-  #return "[%s] %s Packet: IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), svc_guess_local, p.dst, str(pkt.dst), svc_guess_remote)
+  results.append({'No': pktCount, 'Protocol': proto_name, 'Src IP': p.src, 'Src MAC': str(pkt.src), 'Src Service': srvc_local, 'Dest IP': p.dst, 'Dest MAC': str(pkt.dst), 'Dest Service': srvc_remote})
+  return "[%s] %s Packet: IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), srvc_local, p.dst, str(pkt.dst), srvc_remote)
 
 # decodes service protocol via ports used by a packet
 # (Reference : https://gist.github.com/dreilly369/a9b9f7e6de96b2cef728bd04527c1ceb)
 def decode_protocol(pkt, local=True):
+  global services
   if local:
-      try:
-          if pkt.sport in service_guesses.keys():
-              srvc_guess = service_guesses[pkt.sport]
-          else:
-              srvc_guess = str(pkt.sport)
-      except AttributeError:
-          srvc_guess = None
+    try:
+      if pkt.sport in service_guesses.keys():
+        srvc_guess = service_guesses[pkt.sport]
+
+        if srvc_guess is 'HTTP':
+          services['HTTP'] += 1
+        elif srvc_guess is 'HTTPS':
+          services['HTTPS'] += 1
+        elif srvc_guess is 'DHCP':
+          services['DHCP'] += 1
+        elif srvc_guess is  'ARP':
+          services['ARP'] += 1
+        elif srvc_guess is  'FTP':
+          services['FTP'] += 1
+        elif srvc_guess is 'SMTP':
+          services['SMTP'] += 1
+        elif srvc_guess is  'POP3':
+          services['POP3'] += 1
+        elif srvc_guess is 'SSH':
+          services['SSH'] += 1
+        elif srvc_guess is  'TELNET':
+          services['TELNET'] += 1
+
+      else:
+        srvc_guess = str(pkt.sport)
+        services['OTHERS'] += 1
+        
+
+    except AttributeError:
+        srvc_guess = None
   else:
       try:
           if pkt.dport in service_guesses.keys():
@@ -158,6 +155,8 @@ def decode_protocol(pkt, local=True):
   return srvc_guess
 
 def main(argv):
+  global iface
+
   parser = argparse.ArgumentParser(prog="NetSniff", formatter_class=RawTextHelpFormatter, description=""
                                   + "ARP Scan: 'sudo python3 main.py -arp -ip [IP subnetwork]'\n"
                                   + ""
@@ -169,8 +168,8 @@ def main(argv):
 
   sniffer = parser.add_argument_group('Packet Sniffing')
   sniffer.add_argument('-sniff', action="store_true", help="Sniff network packets")
-  sniffer.add_argument("-i", "--iface", dest="iface",default=None, help="Specify network interface to bind to")
-  sniffer.add_argument("-c", "--count", dest="count",default=None, help="specify number of packets to be captured [default: X]")
+  sniffer.add_argument("-i", "--iface", dest="iface", default=None, help="Specify network interface to bind to")
+  sniffer.add_argument("-c", "--count", dest="count", default=None, help="specify number of packets to be captured [default: X]")
   sniffer.add_argument("-o", "--outfileName", dest="fileName", default=None, help="Specify name for dump file (w/ extension .pcap)")
   sniffer.add_argument("-v", "--verbose", dest="verb", action="store_true", default=False, help="Display packet contents verbosely")
 
@@ -217,9 +216,14 @@ def main(argv):
         print ("Writing packets to %s" % outfile)
         wrpcap(outfile, packets)
     else:
-        sniff(iface=iface, prn=packet_recv, store=0)
+        sniff(iface=args.iface, prn=packet_recv, store=0)
     
     print(tabulate(results, headers="keys", tablefmt="psql"))
+
+    print('Protocols Sniffed Statistics:')
+    for srvc, value in services.items():
+      print(srvc, ':', value)
+    
     
 def KeyboardInterruptHandler(signal, frame):
   print("Goodbye!")

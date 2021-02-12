@@ -20,6 +20,8 @@ fileName = None
 verbose = False
 pktCount = 0
 results = []
+send_count = []
+rcv_count = []
 services = {'HTTP': 0, 'HTTPS': 0, 'DHCP': 0, 'ARP': 0, 'FTP': 0, 'SMTP': 0, 'POP3': 0, 'SSH': 0, 'TELNET': 0, 'OTHERS' : 0}
 
 protocols = {
@@ -106,28 +108,30 @@ def packet_recv(pkt):
 # (Reference : https://gist.github.com/dreilly369/a9b9f7e6de96b2cef728bd04527c1ceb)
 def decode_protocol(pkt, local=True):
   global services
+  global send_count
+  global rcv_count
   if local:
     try:
       if pkt.sport in service_guesses.keys():
         srvc_guess = service_guesses[pkt.sport]
 
-        if srvc_guess is 'HTTP':
+        if srvc_guess == 'HTTP':
           services['HTTP'] += 1
-        elif srvc_guess is 'HTTPS':
+        elif srvc_guess == 'HTTPS':
           services['HTTPS'] += 1
-        elif srvc_guess is 'DHCP':
+        elif srvc_guess == 'DHCP':
           services['DHCP'] += 1
-        elif srvc_guess is  'ARP':
+        elif srvc_guess ==  'ARP':
           services['ARP'] += 1
-        elif srvc_guess is  'FTP':
+        elif srvc_guess ==  'FTP':
           services['FTP'] += 1
-        elif srvc_guess is 'SMTP':
+        elif srvc_guess == 'SMTP':
           services['SMTP'] += 1
-        elif srvc_guess is  'POP3':
+        elif srvc_guess ==  'POP3':
           services['POP3'] += 1
-        elif srvc_guess is 'SSH':
+        elif srvc_guess == 'SSH':
           services['SSH'] += 1
-        elif srvc_guess is  'TELNET':
+        elif srvc_guess ==  'TELNET':
           services['TELNET'] += 1
 
       else:
@@ -143,6 +147,29 @@ def decode_protocol(pkt, local=True):
               srvc_guess = str(pkt.dport)
       except AttributeError:
           srvc_guess = None
+
+  found = False
+  if not send_count:
+    send_count.append({'ip': str(pkt.src), 'count': 1})
+  else:
+    for send in send_count:
+      if send['ip'] == str(pkt.src):
+        found = True
+        send['count'] += 1
+    if not found:
+      send_count.append({'ip': str(pkt.src), 'count': 1})
+
+  found = False
+  if not rcv_count:
+    rcv_count.append({'ip': str(pkt.dst), 'count': 1})
+  else:
+    for rcv in rcv_count:
+      if rcv['ip'] == str(pkt.dst):
+        found = True
+        rcv['count'] += 1
+    if not found:
+      rcv_count.append({'ip': str(pkt.dst), 'count': 1})
+  
   return srvc_guess
 
 def main(argv):
@@ -209,9 +236,38 @@ def main(argv):
     clrscr()
     print(tabulate(results, headers="keys", tablefmt="psql"))
 
-    print('Protocols Sniffed Statistics:')
+    print('\nProtocols Sniffed Statistics:')
     for srvc, value in services.items():
       print(srvc, ':', value)
+
+    print('\nTop Conversation')
+    print('[Sender] ', end="")
+    highest_count = -1
+    ip = ""
+    mac = ""
+    for sender in send_count:
+      if sender['count'] > highest_count:
+        ip = sender['ip']
+        highest_count = sender['count']
+    for res in results:
+      if ip == res['Src IP']:
+        mac = res['Src MAC']
+        break
+    print('%s (%s) sent %d packets' % (ip, mac, highest_count))
+
+    print('[Receiver] ', end="")
+    highest_count = -1
+    ip = ""
+    mac = ""
+    for receiver in rcv_count:
+      if receiver['count'] > highest_count:
+        ip = receiver['ip']
+        highest_count = receiver['count']
+    for res in results:
+      if ip == res['Dest IP']:
+        mac = res['Dest MAC']
+        break
+    print('%s (%s) received %d packets' % (ip, mac, highest_count))
     
     
 def KeyboardInterruptHandler(signal, frame):
@@ -223,7 +279,28 @@ def KeyboardInterruptHandler(signal, frame):
     print('\nProtocols Sniffed Statistics:')
     for srvc, value in services.items():
       print(srvc, ':', value)
-  
+
+    print('Top Conversation')
+    print('[Sender] ', end="")
+    highest_count = -1
+    ip = ""
+    mac = ""
+    for sender in send_count:
+      if sender['count'] > highest_count:
+        ip = sender['ip']
+        highest_count = sender['count']
+    print('%s (%s) sent %d packets' % (ip, mac, highest_count))
+
+    print('[Receiver] ', end="")
+    highest_count = -1
+    ip = ""
+    mac = ""
+    for receiver in rcv_count:
+      if receiver['count'] > highest_count:
+        ip = receiver['ip']
+        highest_count = receiver['count']
+    print('%s (%s) sent %d packets' % (ip, mac, highest_count))
+
   print("Goodbye!")
   sys.exit(0)
 

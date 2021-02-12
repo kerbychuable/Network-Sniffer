@@ -83,8 +83,6 @@ def packet_recv(pkt):
   # append packet to output file
   if fileName:
       wrpcap(fileName, pkt, append=True)
-  if verbose:
-      pkt.show()
 
   p = pkt[0][1]
 
@@ -97,17 +95,12 @@ def packet_recv(pkt):
   srvc_remote = decode_protocol(p, False)
         
   if srvc_remote and srvc_remote in ["IMAP","POP3","SMTP"]:
-      if verbose:
-          print ("[+] Checking for mail creds")
       mail_creds(pkt)
   elif ARP in pkt:
-      if verbose:
-          print ("[+] ARP packet being sent to ARP specific function")
       arp_display(pkt)
 
   results.append({'No': pktCount, 'Protocol': proto_name, 'Src IP': p.src, 'Src MAC': str(pkt.src), 'Src Service': srvc_local, 'Dest IP': p.dst, 'Dest MAC': str(pkt.dst), 'Dest Service': srvc_remote})
-  
-  return "[%s] %s Packet: IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), srvc_local, p.dst, str(pkt.dst), srvc_remote)
+  print("[%d] %s IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), srvc_local, p.dst, str(pkt.dst), srvc_remote))
 
 # decodes service protocol via ports used by a packet
 # (Reference : https://gist.github.com/dreilly369/a9b9f7e6de96b2cef728bd04527c1ceb)
@@ -140,8 +133,6 @@ def decode_protocol(pkt, local=True):
       else:
         srvc_guess = str(pkt.sport)
         services['OTHERS'] += 1
-        
-
     except AttributeError:
         srvc_guess = None
   else:
@@ -171,7 +162,6 @@ def main(argv):
   sniffer.add_argument("-i", "--iface", dest="iface", default=None, help="Specify network interface to bind to")
   sniffer.add_argument("-c", "--count", dest="count", default=None, help="specify number of packets to be captured [default: X]")
   sniffer.add_argument("-o", "--outfileName", dest="fileName", default=None, help="Specify name for dump file (w/ extension .pcap)")
-  sniffer.add_argument("-v", "--verbose", dest="verb", action="store_true", default=False, help="Display packet contents verbosely")
 
   args = parser.parse_args()
 
@@ -179,9 +169,6 @@ def main(argv):
     iface = args.iface.strip()
   if args.fileName:
     outfile = args.fileName
-
-  if args.verb:
-    verbose =True
 
   # ARP Scan
   if("-arp" in argv) or ("--arp-scan" in argv):
@@ -219,6 +206,7 @@ def main(argv):
     else:
         sniff(iface=args.iface, prn=packet_recv, store=0)
     
+    clrscr()
     print(tabulate(results, headers="keys", tablefmt="psql"))
 
     print('Protocols Sniffed Statistics:')
@@ -229,6 +217,7 @@ def main(argv):
 def KeyboardInterruptHandler(signal, frame):
   global services
   if issniffing:
+    clrscr()
     print('\n', tabulate(results, headers="keys", tablefmt="psql"))
 
     print('\nProtocols Sniffed Statistics:')

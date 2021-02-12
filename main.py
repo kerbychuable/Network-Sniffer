@@ -12,9 +12,8 @@ from argparse import RawTextHelpFormatter
 from scapy.all import *
 from tabulate import tabulate
 
-import collections
-
 # Globals
+issniffing = False
 iface = ""
 count = None
 fileName = None
@@ -107,6 +106,7 @@ def packet_recv(pkt):
       arp_display(pkt)
 
   results.append({'No': pktCount, 'Protocol': proto_name, 'Src IP': p.src, 'Src MAC': str(pkt.src), 'Src Service': srvc_local, 'Dest IP': p.dst, 'Dest MAC': str(pkt.dst), 'Dest Service': srvc_remote})
+  
   return "[%s] %s Packet: IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), srvc_local, p.dst, str(pkt.dst), srvc_remote)
 
 # decodes service protocol via ports used by a packet
@@ -156,6 +156,7 @@ def decode_protocol(pkt, local=True):
 
 def main(argv):
   global iface
+  global issniffing
 
   parser = argparse.ArgumentParser(prog="NetSniff", formatter_class=RawTextHelpFormatter, description=""
                                   + "ARP Scan: 'sudo python3 main.py -arp -ip [IP subnetwork]'\n"
@@ -202,17 +203,18 @@ def main(argv):
 
   # Network Sniffing
   elif args.sniff:
-        
+    issniffing = True
+
     target = iface or "all interfaces"
     print ("Capturing packets on: %s" % target)
 
     if args.count:
         limit = int(args.count)
         print ("Capture Limit: %d packets" % limit)
-        packets = sniff(iface=iface, prn=packet_recv, count=limit)
+        packets = sniff(iface=args.iface, prn=packet_recv, count=limit)
         # write out the captured packets
 
-        print ("Writing packets to %s" % outfile)
+        print ("\nWriting packets to %s" % outfile)
         wrpcap(outfile, packets)
     else:
         sniff(iface=args.iface, prn=packet_recv, store=0)
@@ -225,6 +227,14 @@ def main(argv):
     
     
 def KeyboardInterruptHandler(signal, frame):
+  global services
+  if issniffing:
+    print('\n', tabulate(results, headers="keys", tablefmt="psql"))
+
+    print('\nProtocols Sniffed Statistics:')
+    for srvc, value in services.items():
+      print(srvc, ':', value)
+  
   print("Goodbye!")
   sys.exit(0)
 

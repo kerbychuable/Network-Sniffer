@@ -164,13 +164,12 @@ def main(argv):
                                   + "")
 
   arp_scan = parser.add_argument_group('ARP Scanning')
-  arp_scan.add_argument('-arp', '--arp-scan', action="store_true", help="Scan Address Resolution Protocol to see connected devices to network")
-  arp_scan.add_argument('-ip', default="", help="Target IP subnetwork")
+  arp_scan.add_argument('-arp', '--arp-scan', dest="ip", default=None, help="Scan Address Resolution Protocol to see connected devices to network")
 
   sniffer = parser.add_argument_group('Packet Sniffing')
   sniffer.add_argument('-sniff', action="store_true", help="Sniff network packets")
-  sniffer.add_argument("-i", "--iface", dest="iface",default=None, help="Specify network interface to bind to")
-  sniffer.add_argument("-c", "--count", dest="count",default=None, help="specify number of packets to be captured [default: X]")
+  sniffer.add_argument("-i", "--iface", dest="iface", default=None, help="Specify network interface to bind to")
+  sniffer.add_argument("-c", "--count", dest="count", default=None, help="specify number of packets to be captured [default: X]")
   sniffer.add_argument("-o", "--outfileName", dest="fileName", default=None, help="Specify name for dump file (w/ extension .pcap)")
   sniffer.add_argument("-v", "--verbose", dest="verb", action="store_true", default=False, help="Display packet contents verbosely")
 
@@ -188,7 +187,7 @@ def main(argv):
   if("-arp" in argv) or ("--arp-scan" in argv):
     # target_ip = input("Input IP range for scanning (e.g. 192.168.0.1/24): ")
     # ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=target_ip), timeout=5) # store answered and unanswered packets
-    if args.ip == "":
+    if not args.ip:
       print("Please specify target IP subnetwork")
       print("usage: sudo python3 main.py -arp -ip [IP subnetwork]")
       sys.exit(0)

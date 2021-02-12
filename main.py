@@ -60,19 +60,6 @@ def clrscr():
   else: # Non-Windows
     os.system('clear')
 
-def mail_creds(pkt):
-  if pkt[TCP].payload:
-      mail_packet = str(pacpktket[TCP].payload)
-      if "user" in mail_packet.lower() or "pass" in mail_packet.lower():
-          print ("[+] Server: %s" % pkt[IP].dst)
-          print ("[+] %s" % pkt[TCP].payload)
-
-def arp_display(pkt):
-  if pkt[ARP].op == 1: #who-has (request)
-      return "Request: " + pkt[ARP].psrc + " is asking about " + pkt[ARP].pdst
-  if pkt[ARP].op == 2: #is-at (response)
-      return "*Response: " + pkt[ARP].hwsrc + " has address " + pkt[ARP].psrc
-
 # identifies service protocols of packets and logs them in a raw file (if specififed)
 # (Reference : https://gist.github.com/dreilly369/a9b9f7e6de96b2cef728bd04527c1ceb)
 def packet_recv(pkt):
@@ -95,11 +82,6 @@ def packet_recv(pkt):
 
   srvc_local = decode_protocol(p)
   srvc_remote = decode_protocol(p, False)
-        
-  if srvc_remote and srvc_remote in ["IMAP","POP3","SMTP"]:
-      mail_creds(pkt)
-  elif ARP in pkt:
-      arp_display(pkt)
 
   results.append({'No': pktCount, 'Protocol': proto_name, 'Src IP': p.src, 'Src MAC': str(pkt.src), 'Src Service': srvc_local, 'Dest IP': p.dst, 'Dest MAC': str(pkt.dst), 'Dest Service': srvc_remote})
   print("[%d] %s IP:%s  MAC:%s (%s) ==> IP:%s  MAC:%s (%s)" % (pktCount, proto_name, p.src, str(pkt.src), srvc_local, p.dst, str(pkt.dst), srvc_remote))
@@ -274,6 +256,8 @@ def KeyboardInterruptHandler(signal, frame):
   global services
   if issniffing:
     clrscr()
+    print ("\nWriting packets to %s" % outfile)
+    wrpcap(outfile, packets)
     print('\n', tabulate(results, headers="keys", tablefmt="psql"))
 
     print('\nProtocols Sniffed Statistics:')
